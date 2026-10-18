@@ -6,7 +6,9 @@ from app.database import engine, get_db
 from app.schemas import (
     ApplicationCreate,
     ApplicationResponse,
+    ApplicationStatus,
     ApplicationUpdate,
+    StatisticsResponse,
 )
 
 models.Base.metadata.create_all(bind=engine)
@@ -27,7 +29,7 @@ def create_application(
         position=application.position,
         location=application.location,
         status=application.status.value,
-        job_url=application.job_url,
+        job_url=str(application.job_url) if application.job_url else None,
         notes=application.notes,
     )
 
@@ -38,9 +40,31 @@ def create_application(
     return db_application
 
 @app.get("/applications", response_model=list[ApplicationResponse])
-def get_applications(db: Session = Depends(get_db)):
-    applications = db.query(models.Application).all()
-    return applications
+def get_applications(
+    status: ApplicationStatus | None = None,
+    company: str | None = None,
+    sort_by: str = "id",
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Application)
+
+    if status:
+        query = query.filter(models.Application.status == status.value)
+
+    if company:
+        query = query.filter(models.Application.company == company)
+
+    sort_columns = {
+    "id": models.Application.id,
+    "company": models.Application.company,
+    "status": models.Application.status,
+}
+    
+    sort_column = sort_columns.get(sort_by, models.Application.id)
+    
+    query = query.order_by(sort_column)
+    
+    return query.all()
 
 @app.get("/applications/{application_id}", response_model=ApplicationResponse)
 def get_application(
@@ -75,6 +99,9 @@ def update_application(
 
     if "status" in update_data:
         update_data["status"] = update_data["status"].value
+        
+    if "job_url" in update_data and update_data["job_url"] is not None:
+        update_data["job_url"] = str(update_data["job_url"])
 
     for field, value in update_data.items():
         setattr(application, field, value)
@@ -101,3 +128,40 @@ def delete_application(
     db.commit()
 
     return {"message": "Application deleted successfully"}
+
+@app.get("/statistics", response_model=StatisticsResponse)
+def get_statistics(db: Session = Depends(get_db)):
+    applications = db.query(models.Application).all()
+
+    total = len(applications)
+
+    by_status = {}
+
+    for application in applications:
+        by_status[application.status] = (
+            by_status.get(application.status, 0) + 1
+        )
+
+    interview_count = by_status.get("INTERVIEW", 0)
+    offer_count = by_status.get("OFFER", 0)
+
+    interview_rate = (
+        round(interview_count / total * 100, 2)
+        if total > 0
+        else 0.0
+    )
+
+    offer_rate = (
+        round(offer_count / total * 100, 2)
+        if total > 0
+        else 0.0
+    )
+
+    return {
+        "total": total,
+        "by_status": by_status,
+        "interview_rate": interview_rate,
+        "offer_rate": offer_rate,
+    }
+    
+# uvicorn app.main:app --reload

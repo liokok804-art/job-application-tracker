@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, HttpUrl
 
 class ApplicationStatus(str, Enum):
     SAVED = "SAVED"
@@ -12,12 +12,12 @@ class ApplicationStatus(str, Enum):
     WITHDRAWN = "WITHDRAWN"
     
 class ApplicationCreate(BaseModel):
-    company: str
-    position: str
-    location: str | None = None
+    company: str = Field(min_length=1, max_length=100)
+    position: str = Field(min_length=1, max_length=150)
+    location: str | None = Field(default=None, max_length=100)
     status: ApplicationStatus = ApplicationStatus.SAVED
-    job_url: str | None = None
-    notes: str | None = None
+    job_url: HttpUrl | None = None
+    notes: str | None = Field(default=None, max_length=1000)
 
 class ApplicationResponse(ApplicationCreate):
     id: int
@@ -25,9 +25,15 @@ class ApplicationResponse(ApplicationCreate):
     model_config = {"from_attributes": True}
     
 class ApplicationUpdate(BaseModel):
-    company: str | None = None
-    position: str | None = None
-    location: str | None = None
+    company: str | None = Field(default=None, min_length=1, max_length=100)
+    position: str | None = Field(default=None, min_length=1, max_length=150)
+    location: str | None = Field(default=None, max_length=100)
     status: ApplicationStatus | None = None
-    job_url: str | None = None
-    notes: str | None = None
+    job_url: HttpUrl | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+    
+class StatisticsResponse(BaseModel):
+    total: int
+    by_status: dict[str, int]
+    interview_rate: float
+    offer_rate: float
