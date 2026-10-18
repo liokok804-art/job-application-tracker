@@ -80,7 +80,7 @@ GET /applications?status=INTERVIEW&sort_by=company
 Clone the repository and enter the project directory:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/liokok804-art/job-application-tracker.git
 cd job-application-tracker
 ```
 
